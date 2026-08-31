@@ -1,0 +1,277 @@
+/* ==========================================================================
+   ES-Visuals — global design system
+   Near-black surfaces, hairline rules, one restrained brand blue.
+   ========================================================================== */
+
+:root {
+  /* Surfaces */
+  --bg: #050607;
+  --bg-raise: #0a0c0e;
+  --bg-panel: #0e1114;
+
+  /* Ink */
+  --ink: #f4f5f6;
+  --ink-2: #b7bcc2;
+  --ink-3: #7b828a;
+  --ink-4: #4a5057;
+
+  /* Brand blue — used sparingly, never as a fill */
+  --accent: #3e5c76;
+  --accent-lit: #78a6ce;
+  --accent-glow: #9cc6e8;
+
+  /* Hairlines */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --line-accent: rgba(120, 166, 206, 0.38);
+
+  /* Type */
+  --font: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial,
+    sans-serif;
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Rhythm */
+  --gutter: clamp(20px, 4.5vw, 68px);
+  --section-pad: clamp(96px, 14vh, 180px);
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* The intro owns the viewport until it releases the scroll. */
+body[data-intro='running'] {
+  overflow: hidden;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(120, 166, 206, 0.28);
+  color: #fff;
+}
+
+/* ---- Typography primitives ---------------------------------------------- */
+
+.display {
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0;
+}
+
+.eyebrow--accent {
+  color: var(--accent-lit);
+}
+
+.lede {
+  font-size: clamp(17px, 1.55vw, 22px);
+  line-height: 1.55;
+  letter-spacing: -0.012em;
+  color: var(--ink-2);
+  margin: 0;
+  max-width: 34ch;
+  text-wrap: pretty;
+}
+
+.rule {
+  height: 1px;
+  width: 100%;
+  background: var(--line);
+  border: 0;
+  margin: 0;
+}
+
+/* ---- Layout ------------------------------------------------------------- */
+
+.shell {
+  position: relative;
+  z-index: 2;
+}
+
+.section {
+  position: relative;
+  padding: var(--section-pad) var(--gutter);
+  max-width: 1560px;
+  margin: 0 auto;
+}
+
+.section__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+  margin-bottom: clamp(48px, 7vw, 96px);
+}
+
+@media (min-width: 900px) {
+  .section__head {
+    grid-template-columns: 260px minmax(0, 1fr);
+    align-items: start;
+    gap: 40px;
+  }
+}
+
+.section__title {
+  font-size: clamp(34px, 5.4vw, 76px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.0;
+  margin: 0;
+  max-width: 18ch;
+  text-wrap: balance;
+}
+
+/*
+ * Everything past the seam sits on a full-bleed opaque ground, so the fixed
+ * canvas cannot show through the page gutters.
+ */
+.shell__body {
+  position: relative;
+  background: var(--bg);
+}
+
+/* A soft seam between the fixed canvas and the opaque content below it. */
+.seam {
+  position: relative;
+  height: clamp(120px, 22vh, 260px);
+  background: linear-gradient(to bottom, rgba(5, 6, 7, 0) 0%, var(--bg) 82%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---- Reveal-on-scroll --------------------------------------------------- */
+
+[data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 1.1s var(--ease),
+    transform 1.1s var(--ease);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+[data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---- Cursor ------------------------------------------------------------- */
+
+/* Only hide the native cursor once the custom one is actually mounted. */
+body[data-cursor='on'],
+body[data-cursor='on'] * {
+  cursor: none !important;
+}
+
+/* ---- Accessibility ------------------------------------------------------ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-strong);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: translateY(-200%);
+  transition: transform 0.2s var(--ease);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+:focus-visible {
+  outline: 1px solid var(--accent-lit);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+}

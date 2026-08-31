@@ -1,0 +1,468 @@
+/* ==========================================================================
+   Hero — canvas stage, navigation, lockup, instrumentation, cursor
+   ========================================================================== */
+
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: var(--bg);
+  will-change: opacity;
+}
+
+.stage canvas {
+  display: block;
+  touch-action: pan-y;
+}
+
+.hero {
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  height: 100svh;
+  min-height: 560px;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: max(15vh, 118px) var(--gutter) clamp(28px, 6vh, 64px);
+  pointer-events: none;
+}
+
+.hero > * {
+  pointer-events: auto;
+}
+
+/* ---- Navigation --------------------------------------------------------- */
+
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: clamp(20px, 3vh, 34px) var(--gutter);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translate3d(0, -10px, 0);
+  transition:
+    opacity 1.2s var(--ease) 0.1s,
+    transform 1.2s var(--ease) 0.1s;
+  mix-blend-mode: difference;
+}
+
+.nav.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.nav__mark {
+  color: var(--ink);
+  letter-spacing: 0.22em;
+  font-weight: 500;
+}
+
+.nav__links {
+  display: flex;
+  gap: clamp(18px, 2.6vw, 40px);
+}
+
+.nav__links a {
+  position: relative;
+  color: var(--ink-3);
+  transition: color 0.4s var(--ease);
+}
+
+.nav__links a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -7px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s var(--ease);
+}
+
+.nav__links a:hover,
+.nav__links a.is-active {
+  color: var(--ink);
+}
+
+.nav__links a:hover::after,
+.nav__links a.is-active::after {
+  transform: scaleX(1);
+}
+
+@media (max-width: 620px) {
+  .nav__links {
+    gap: 16px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+  }
+}
+
+/* ---- Hero lockup -------------------------------------------------------- */
+
+.hero-type {
+  align-self: start;
+  justify-self: center;
+  text-align: center;
+  max-width: min(100%, 1100px);
+}
+
+.hero-type > * {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+  transition:
+    opacity 1.4s var(--ease),
+    transform 1.4s var(--ease);
+}
+
+.hero-type.is-in > * {
+  opacity: 1;
+  transform: none;
+}
+
+.hero-type.is-in .hero-type__claim {
+  transition-delay: 0.22s;
+}
+.hero-type.is-in .hero-type__meta {
+  transition-delay: 0.38s;
+}
+.hero-type.is-in .hero-type__cta {
+  transition-delay: 0.52s;
+}
+
+.hero-type__mark {
+  font-size: clamp(46px, 9.4vw, 158px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+  color: var(--ink);
+  margin: 0;
+}
+
+.hero-type__claim {
+  margin: clamp(16px, 2.4vh, 30px) 0 0;
+  font-size: clamp(17px, 2.05vw, 31px);
+  font-weight: 300;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+  color: var(--ink-2);
+}
+
+.hero-type__meta {
+  margin: clamp(14px, 2vh, 22px) 0 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.hero-type__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: clamp(26px, 4vh, 46px);
+  padding-bottom: 9px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line-strong);
+  transition: border-color 0.5s var(--ease);
+}
+
+.hero-type__cta svg {
+  overflow: visible;
+  transition: transform 0.5s var(--ease);
+}
+
+.hero-type__cta:hover {
+  border-color: var(--accent-lit);
+}
+
+.hero-type__cta:hover svg {
+  transform: translateX(7px);
+}
+
+.hero-type__cta:hover span {
+  color: var(--accent-glow);
+}
+
+/* ---- Scroll cue --------------------------------------------------------- */
+
+.hero__scroll {
+  justify-self: end;
+  align-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  opacity: 0;
+  animation: es-fade-in 1.2s var(--ease) 7.4s forwards;
+}
+
+.hero__scroll i {
+  display: block;
+  width: 42px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--ink-4));
+}
+
+@keyframes es-fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Intro read-out ----------------------------------------------------- */
+
+.readout {
+  position: fixed;
+  left: var(--gutter);
+  bottom: clamp(24px, 5vh, 44px);
+  z-index: 30;
+  width: min(340px, 60vw);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition:
+    opacity 0.9s var(--ease),
+    transform 0.9s var(--ease);
+}
+
+.readout.is-out {
+  opacity: 0;
+  transform: translate3d(0, 10px, 0);
+  pointer-events: none;
+}
+
+.readout__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.readout__index {
+  color: var(--accent-lit);
+}
+
+.readout__label {
+  color: var(--ink-2);
+  flex: 1;
+}
+
+.readout__steps {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.readout__steps i {
+  width: 4px;
+  height: 4px;
+  background: var(--line-strong);
+  transition: background 0.4s var(--ease);
+}
+
+.readout__steps i.is-done {
+  background: var(--accent-lit);
+}
+
+.readout__track {
+  height: 1px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.readout__track span {
+  display: block;
+  height: 100%;
+  background: var(--accent-lit);
+  transform-origin: left;
+  will-change: transform;
+}
+
+/* ---- Hover annotation --------------------------------------------------- */
+
+.annot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 25;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease);
+  will-change: transform;
+}
+
+.annot.is-in {
+  opacity: 1;
+}
+
+.annot__stem {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 54px;
+  background: linear-gradient(to top, rgba(120, 166, 206, 0), var(--accent-lit));
+  transform: rotate(-40deg);
+  transform-origin: bottom center;
+}
+
+.annot__body {
+  position: absolute;
+  left: 36px;
+  top: -66px;
+  display: block;
+  padding-left: 12px;
+  border-left: 1px solid var(--line-accent);
+  white-space: nowrap;
+}
+
+.annot__tag {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--accent-glow);
+}
+
+.annot__detail {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  letter-spacing: -0.005em;
+  color: var(--ink-3);
+}
+
+/* ---- Cursor ------------------------------------------------------------- */
+
+.cursor {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+
+.cursor.is-visible {
+  opacity: 1;
+}
+
+.cursor__ring,
+.cursor__dot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+.cursor__ring {
+  margin: -22px 0 0 -22px;
+  color: var(--ink-3);
+  opacity: 0.55;
+  transition:
+    transform 0.05s linear,
+    opacity 0.4s var(--ease);
+}
+
+.cursor__ring svg {
+  transition:
+    transform 0.5s var(--ease),
+    color 0.4s var(--ease);
+}
+
+.cursor__ring path {
+  stroke-width: 1;
+}
+
+.cursor__ring circle {
+  stroke-width: 1;
+  stroke-dasharray: 8 6;
+  transition: stroke-dasharray 0.5s var(--ease);
+}
+
+.cursor__dot {
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: var(--ink);
+  border-radius: 50%;
+  transition:
+    opacity 0.3s var(--ease),
+    transform 0.05s linear;
+}
+
+.cursor[data-mode='link'] .cursor__ring,
+.cursor[data-mode='cta'] .cursor__ring {
+  color: var(--accent-glow);
+  opacity: 1;
+}
+
+.cursor[data-mode='link'] .cursor__ring svg,
+.cursor[data-mode='cta'] .cursor__ring svg {
+  transform: scale(1.45) rotate(45deg);
+}
+
+.cursor[data-mode='link'] .cursor__ring circle,
+.cursor[data-mode='cta'] .cursor__ring circle {
+  stroke-dasharray: 3 5;
+}
+
+.cursor[data-mode='press'] .cursor__ring svg {
+  transform: scale(0.8);
+}
+
+/* ---- Static fallback ---------------------------------------------------- */
+
+.fallback {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.fallback__plate {
+  width: 100%;
+  height: 100%;
+}
+
+
+@media (max-width: 760px) {
+  .hero {
+    padding-top: max(19vh, 128px);
+  }
+
+  .hero__scroll {
+    justify-self: start;
+  }
+
+  .readout {
+    width: calc(100% - var(--gutter) * 2);
+  }
+
+  .annot {
+    display: none;
+  }
+}
