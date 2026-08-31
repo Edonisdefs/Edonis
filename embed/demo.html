@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ES-Visuals hero — embed demo</title>
+    <style>
+      body {
+        margin: 0;
+        background: #050607;
+        color: #f4f5f6;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      }
+      /* The only requirement: the container needs a size. */
+      #hero {
+        width: 100%;
+        height: 100vh;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-content: start center;
+        padding-top: 15vh;
+        text-align: center;
+        pointer-events: none;
+        z-index: 3;
+      }
+      .overlay h1 {
+        margin: 0;
+        font-size: clamp(46px, 9vw, 150px);
+        font-weight: 500;
+        letter-spacing: -0.055em;
+        opacity: 0;
+        transition: opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .overlay.is-in h1 { opacity: 1; }
+      .readout {
+        position: absolute;
+        left: 24px;
+        bottom: 24px;
+        z-index: 3;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #7b828a;
+      }
+      .readout b { color: #78a6ce; font-weight: 400; }
+      section { padding: 20vh 24px; max-width: 720px; margin: 0 auto; line-height: 1.6; }
+      code { background: #12161a; padding: 2px 6px; }
+    </style>
+  </head>
+  <body>
+    <div style="position: relative">
+      <div id="hero"></div>
+      <div class="overlay"><h1>ES&#8209;VISUALS</h1></div>
+      <div class="readout"><b id="idx">01</b> <span id="label">Floor plan</span></div>
+    </div>
+
+    <section>
+      <p>
+        The hero above is driven entirely by <code>ESVisualsHero.create()</code>. Everything else on
+        this page — the wordmark, the read-out — is ordinary host markup reacting to its callbacks.
+      </p>
+    </section>
+
+    <script type="module">
+      import ESVisualsHero from './src/index.js';
+
+      const overlay = document.querySelector('.overlay');
+      const hero = ESVisualsHero.create('#hero', {
+        scrollDrive: true,
+        onPhase: (stage) => {
+          document.getElementById('idx').textContent = stage.index;
+          document.getElementById('label').textContent = stage.label;
+        },
+        onComplete: () => overlay.classList.add('is-in'),
+        onHover: (part) => part && console.log('hover:', part.tag, part.detail),
+      });
+
+      window.hero = hero; // for poking at in the console
+    </script>
+  </body>
+</html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ES-Visuals hero — script-tag embed</title>
+    <style>
+      body { margin: 0; background: #050607; color: #f4f5f6; font-family: system-ui, sans-serif; }
+      #hero { width: 100%; height: 100vh; }
+      .readout { position: absolute; left: 24px; bottom: 24px; z-index: 3;
+        font-family: ui-monospace, Menlo, monospace; font-size: 10px;
+        letter-spacing: .2em; text-transform: uppercase; color: #7b828a; }
+      .readout b { color: #78a6ce; font-weight: 400; }
+    </style>
+  </head>
+  <body>
+    <div style="position: relative">
+      <div id="hero"></div>
+      <div class="readout"><b id="idx">01</b> <span id="label">Floor plan</span></div>
+    </div>
+
+    <script src="./dist/es-visuals-hero.umd.js"></script>
+    <script>
+      window.hero = ESVisualsHero.create('#hero', {
+        quality: new URLSearchParams(location.search).get('q') || 'auto',
+        onPhase: function (stage) {
+          document.getElementById('idx').textContent = stage.index;
+          document.getElementById('label').textContent = stage.label;
+        },
+      });
+    </script>
+  </body>
+</html>
