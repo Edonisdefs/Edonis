@@ -1,0 +1,666 @@
+// Edonis – KI-Büroassistent für Handwerksbetriebe
+// Multi-Tenant: jede Fachtabelle trägt eine organizationId.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Trade {
+  SHK // Sanitär, Heizung, Klima
+  ELEKTRO
+  MALER
+  DACHDECKER
+  SCHREINER
+  BAU
+  SONSTIGES
+}
+
+enum UserRole {
+  OWNER // Inhaber: alles inkl. Einstellungen und Löschung
+  OFFICE // Büro: Kunden, Aufträge, Rechnungen
+  FIELD // Monteur: Aufträge erfassen, keine Rechnungsfreigabe
+}
+
+enum CustomerType {
+  PRIVATE
+  COMPANY
+}
+
+enum JobStatus {
+  DRAFT // angelegt, noch nichts passiert
+  SCHEDULED // eingeplant
+  IN_PROGRESS // Monteur arbeitet
+  NEEDS_REVIEW // KI-Vorschlag wartet auf Bestätigung
+  READY_TO_INVOICE // Leistungen bestätigt
+  INVOICED // Rechnung erstellt
+  CLOSED // abgeschlossen / bezahlt
+  CANCELLED
+}
+
+enum NoteSource {
+  MANUAL
+  VOICE
+  AI
+}
+
+enum VoiceNoteStatus {
+  UPLOADED
+  TRANSCRIBING
+  TRANSCRIBED
+  FAILED
+}
+
+enum ExtractionSource {
+  VOICE
+  TEXT
+  PHOTO
+}
+
+enum ExtractionStatus {
+  PENDING // wartet auf Prüfung durch den Nutzer
+  CONFIRMED // vom Nutzer bestätigt (ggf. korrigiert)
+  REJECTED // verworfen
+  FAILED
+}
+
+enum InvoiceStatus {
+  DRAFT // Entwurf – nie versendet
+  OPEN // freigegeben / offen
+  PAID
+  CANCELLED
+}
+
+enum InvoiceItemKind {
+  LABOR
+  MATERIAL
+  TRAVEL
+  OTHER
+}
+
+enum DocumentKind {
+  INVOICE_PDF
+  SERVICE_REPORT_PDF
+  PHOTO
+  OTHER
+}
+
+// ---------------------------------------------------------------------------
+// Mandant
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id    String @id @default(cuid())
+  name  String
+  slug  String @unique
+  trade Trade  @default(SHK)
+
+  // Unternehmensdaten für die Rechnung (§ 14 UStG)
+  legalName    String?
+  street       String?
+  zip          String?
+  city         String?
+  country      String  @default("DE")
+  email        String?
+  phone        String?
+  website      String?
+  taxNumber    String? // Steuernummer
+  vatId        String? // USt-IdNr.
+  ownerName    String?
+  registerInfo String? // Handelsregister / Handwerkskammer
+  bankName     String?
+  iban         String?
+  bic          String?
+
+  // Kaufmännische Defaults
+  defaultHourlyRate Decimal @default(65.00) @db.Decimal(10, 2)
+  defaultVatRate    Decimal @default(19.00) @db.Decimal(5, 2)
+  travelFlatRate    Decimal @default(0.00) @db.Decimal(10, 2)
+  smallBusiness     Boolean @default(false) // § 19 UStG
+  paymentTermsDays  Int     @default(14)
+  invoicePrefix     String  @default("RE")
+  invoiceCounter    Int     @default(0)
+  jobPrefix         String  @default("A")
+  jobCounter        Int     @default(0)
+  invoiceFooterNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  employees    Employee[]
+  customers    Customer[]
+  sites        Site[]
+  materials    Material[]
+  jobs         Job[]
+  invoices     Invoice[]
+  documents    Document[]
+  auditLogs    AuditLog[]
+  voiceNotes   VoiceNote[]
+  jobPhotos    JobPhoto[]
+  extractions  AiExtraction[]
+  reports      ServiceReport[]
+  jobNotes     JobNote[]
+  jobMaterials JobMaterial[]
+  timeEntries  JobTimeEntry[]
+  activities   JobActivity[]
+  invoiceItems InvoiceItem[]
+  sessions     Session[]
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  email        String
+  passwordHash String
+  name         String
+  role         UserRole  @default(OFFICE)
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions    Session[]
+  employee    Employee?
+  auditLogs   AuditLog[]
+  notes       JobNote[]
+  confirmed   AiExtraction[]  @relation("ExtractionConfirmedBy")
+  documents   Document[]
+  voiceNotes  VoiceNote[]
+  jobPhotos   JobPhoto[]
+  reports     ServiceReport[]
+  releasedInv Invoice[]       @relation("InvoiceReleasedBy")
+
+  @@unique([email])
+  @@index([organizationId])
+}
+
+model Session {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String   @unique
+  expiresAt DateTime
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Employee {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name       String
+  role       String? // z.B. "Anlagenmechaniker SHK"
+  email      String?
+  phone      String?
+  hourlyRate Decimal? @db.Decimal(10, 2)
+  active     Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobs        JobAssignment[]
+  timeEntries JobTimeEntry[]
+
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Stammdaten
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customerNumber String
+  type           CustomerType @default(PRIVATE)
+  name           String
+  contactPerson  String?
+  email          String?
+  phone          String?
+  street         String?
+  zip            String?
+  city           String?
+  country        String       @default("DE")
+  vatId          String?
+  hourlyRate     Decimal?     @db.Decimal(10, 2)
+  notes          String?
+  archivedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sites     Site[]
+  jobs      Job[]
+  invoices  Invoice[]
+  documents Document[]
+
+  @@unique([organizationId, customerNumber])
+  @@index([organizationId, name])
+}
+
+model Site {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  label   String // "Baustelle Müller – Bad OG"
+  street  String?
+  zip     String?
+  city    String?
+  country String  @default("DE")
+  notes   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobs Job[]
+
+  @@index([organizationId])
+  @@index([customerId])
+}
+
+model Material {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  sku          String?
+  name         String
+  category     String?
+  unit         String   @default("Stück")
+  defaultPrice Decimal? @db.Decimal(10, 2)
+  // Suchbegriffe, damit die KI "Flexschlauch" auf den Katalogartikel mappen kann
+  aliases      String[] @default([])
+  active       Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  jobMaterials JobMaterial[]
+
+  @@index([organizationId, name])
+}
+
+// ---------------------------------------------------------------------------
+// Aufträge
+// ---------------------------------------------------------------------------
+
+model Job {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  jobNumber   String
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  siteId      String?
+  site        Site?     @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  status      JobStatus @default(SCHEDULED)
+  scheduledAt DateTime?
+  performedAt DateTime?
+  hourlyRate  Decimal?  @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments   JobAssignment[]
+  activities    JobActivity[]
+  timeEntries   JobTimeEntry[]
+  materials     JobMaterial[]
+  notes         JobNote[]
+  photos        JobPhoto[]
+  voiceNotes    VoiceNote[]
+  extractions   AiExtraction[]
+  serviceReport ServiceReport?
+  invoices      Invoice[]
+  documents     Document[]
+
+  @@unique([organizationId, jobNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, scheduledAt])
+  @@index([customerId])
+}
+
+model JobAssignment {
+  jobId      String
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, employeeId])
+  @@index([employeeId])
+}
+
+model JobActivity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  description String
+  sortOrder   Int        @default(0)
+  source      NoteSource @default(MANUAL)
+
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+  @@index([organizationId])
+}
+
+model JobTimeEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  employeeId     String?
+  employee       Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  date        DateTime
+  startTime   String? // "08:00"
+  endTime     String? // "10:00"
+  hours       Decimal    @db.Decimal(6, 2)
+  hourlyRate  Decimal?   @db.Decimal(10, 2)
+  description String?
+  source      NoteSource @default(MANUAL)
+
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+  @@index([organizationId, date])
+}
+
+model JobMaterial {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  materialId     String?
+  material       Material?    @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
+  description String
+  quantity    Decimal    @db.Decimal(10, 3)
+  unit        String     @default("Stück")
+  unitPrice   Decimal?   @db.Decimal(10, 2)
+  source      NoteSource @default(MANUAL)
+
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+  @@index([organizationId])
+}
+
+model JobNote {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  authorId       String?
+  author         User?        @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  text   String
+  source NoteSource @default(MANUAL)
+
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+  @@index([organizationId])
+}
+
+model JobPhoto {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  uploadedById   String?
+  uploadedBy     User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  storageKey String
+  filename   String
+  mimeType   String
+  size       Int
+  caption    String?
+  takenAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+  @@index([organizationId])
+}
+
+model VoiceNote {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  recordedById   String?
+  recordedBy     User?        @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  storageKey     String
+  filename       String
+  mimeType       String
+  size           Int
+  durationSec    Int?
+  status         VoiceNoteStatus @default(UPLOADED)
+  transcript     String?
+  transcriptLang String?
+  sttProvider    String?
+  sttModel       String?
+  error          String?
+
+  createdAt     DateTime  @default(now())
+  transcribedAt DateTime?
+
+  extractions AiExtraction[]
+
+  @@index([jobId])
+  @@index([organizationId, status])
+}
+
+/// Ein KI-Vorschlag. Wird NIE direkt auf den Auftrag geschrieben,
+/// sondern muss vom Nutzer geprüft und bestätigt werden.
+model AiExtraction {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  voiceNoteId    String?
+  voiceNote      VoiceNote?   @relation(fields: [voiceNoteId], references: [id], onDelete: SetNull)
+
+  source     ExtractionSource @default(VOICE)
+  inputText  String?
+  /// Rohes, validiertes JSON-Ergebnis der KI (JobReportExtraction)
+  result     Json
+  confidence Decimal?         @db.Decimal(4, 3)
+  missing    String[]         @default([])
+  status     ExtractionStatus @default(PENDING)
+  provider   String?
+  model      String?
+  error      String?
+
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
+  confirmedById String?
+  confirmedBy   User?     @relation("ExtractionConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  /// Vom Nutzer korrigierte Fassung, die tatsächlich übernommen wurde
+  confirmedData Json?
+
+  @@index([jobId])
+  @@index([organizationId, status])
+}
+
+/// Leistungsnachweis: unveränderlicher Snapshot der bestätigten Leistungen.
+model ServiceReport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String       @unique
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdById    String?
+  createdBy      User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  number      String
+  performedOn DateTime
+  summary     String?
+  /// Snapshot: { activities, timeEntries, materials, totals }
+  data        Json
+  signedBy    String?
+  signedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Rechnungen
+// ---------------------------------------------------------------------------
+
+model Invoice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customerId     String
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  jobId          String?
+  job            Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  invoiceNumber String
+  status        InvoiceStatus @default(DRAFT)
+  issueDate     DateTime      @default(now())
+  serviceDate   DateTime
+  serviceDateTo DateTime?
+  dueDate       DateTime?
+
+  // Snapshot der Empfänger- und Absenderdaten zum Zeitpunkt der Erstellung
+  billingSnapshot Json
+
+  netTotal   Decimal @default(0) @db.Decimal(12, 2)
+  vatTotal   Decimal @default(0) @db.Decimal(12, 2)
+  grossTotal Decimal @default(0) @db.Decimal(12, 2)
+
+  smallBusiness Boolean @default(false)
+  introText     String?
+  outroText     String?
+  notes         String?
+
+  pdfStorageKey String?
+  releasedAt    DateTime?
+  releasedById  String?
+  releasedBy    User?     @relation("InvoiceReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
+  paidAt        DateTime?
+  cancelledAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     InvoiceItem[]
+  documents Document[]
+
+  @@unique([organizationId, invoiceNumber])
+  @@index([organizationId, status])
+  @@index([customerId])
+}
+
+model InvoiceItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  position    Int
+  kind        InvoiceItemKind @default(OTHER)
+  description String
+  quantity    Decimal         @db.Decimal(10, 3)
+  unit        String          @default("Stück")
+  unitPrice   Decimal         @db.Decimal(10, 2)
+  netAmount   Decimal         @db.Decimal(12, 2)
+  vatRate     Decimal         @db.Decimal(5, 2)
+
+  @@index([invoiceId])
+  @@index([organizationId])
+}
+
+model Document {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  jobId          String?
+  job            Job?         @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  customerId     String?
+  customer       Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  invoiceId      String?
+  invoice        Invoice?     @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  uploadedById   String?
+  uploadedBy     User?        @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  kind       DocumentKind @default(OTHER)
+  title      String
+  filename   String
+  storageKey String
+  mimeType   String
+  size       Int
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, kind])
+  @@index([jobId])
+}
+
+/// Audit-Log für kritische Aktionen (Login, Bestätigung von KI-Daten,
+/// Rechnungsfreigabe, Löschungen). Enthält bewusst keine Klartext-Inhalte
+/// personenbezogener Daten, nur Referenzen und Kennzahlen.
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action     String // z.B. "invoice.release"
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ip         String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}

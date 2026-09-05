@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/*
+ * Edonis Design-Tokens.
+ * Ruhiges, sachliches B2B-Erscheinungsbild: viel Weißraum, klare Kanten,
+ * kräftige Primärfarbe nur für Aktionen. Große Touch-Ziele für die Baustelle.
+ */
+@theme {
+  --color-background: #f4f6f9;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-muted: #64748b;
+  --color-subtle: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+  --color-primary-soft: #eff4ff;
+  --color-primary-foreground: #ffffff;
+
+  --color-success: #15803d;
+  --color-success-soft: #ecfdf3;
+  --color-warning: #b45309;
+  --color-warning-soft: #fff7ed;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fef2f2;
+  --color-info: #0369a1;
+  --color-info-soft: #f0f9ff;
+
+  --radius-card: 14px;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  /* iOS: Platz für die untere Navigationsleiste inkl. Safe-Area. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Eingabefelder nie kleiner als 16px – sonst zoomt iOS beim Fokus. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 14px;
+  }
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@keyframes edonis-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(1.04);
+  }
+}
+
+.animate-record {
+  animation: edonis-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes edonis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: edonis-spin 1s linear infinite;
+}
+
+/* Scrollbars in Tabellenbereichen dezent halten. */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
